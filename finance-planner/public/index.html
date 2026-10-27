@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="用 PV、FV、PMT 計算理財目標：每月該存多少、未來有多少、現在需要多少。">
+<title>理財目標規劃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&display=swap">
+<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<style>
+/* Layout: 總覽橫幅 → 目標清單 → 左側設定表單(固定) + 右側分析(判定、PMT/FV/PV、圖表、建議、敏感度) */
+:root{
+  --bg:#F1F4F8; --surface:#FBFCFD; --ink:#0E1A26; --ink2:#47556A; --muted:#5F6E80;
+  --line:#DCE2E9; --line2:#C3CCD7; --accent:#1D5FB8; --on-accent:#ffffff;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --st-good:#0ca30c; --st-warn:#fab219; --st-bad:#d03b3b;
+  --font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-display:"Noto Serif TC","Songti TC","PMingLiU",serif;
+  --font-num:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1218; --surface:#141C24; --ink:#E8EEF4; --ink2:#AEBBC8; --muted:#8D9BAA;
+    --line:#25303B; --line2:#35424F; --accent:#5B9BF0; --on-accent:#0C1218;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1218; --surface:#141C24; --ink:#E8EEF4; --ink2:#AEBBC8; --muted:#8D9BAA;
+  --line:#25303B; --line2:#35424F; --accent:#5B9BF0; --on-accent:#0C1218;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+.page{max-width:1180px;margin:0 auto;padding-block:28px 56px;display:flex;flex-direction:column;gap:22px;min-width:0}
+h1,h2,h3,p{margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--font-num);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+/* header */
+.top{display:flex;flex-direction:column;gap:6px}
+.top h1{font-family:var(--font-display);font-size:clamp(26px,4.2vw,36px);line-height:1.25;letter-spacing:.01em;text-wrap:balance}
+.top p{color:var(--ink2);max-width:60ch}
+.note{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--ink2);border:1px dashed var(--line2);border-radius:8px;padding:8px 12px;background:var(--surface)}
+
+/* overview band */
+.band{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.cell{padding:14px 18px;display:flex;flex-direction:column;gap:2px;min-width:0;border-left:1px solid var(--line)}
+.cell:first-child{border-left:0}
+.lab{font-size:12.5px;color:var(--muted)}
+.val{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;line-height:1.35}
+.sub{font-size:12.5px;color:var(--ink2)}
+.cell input{width:100%;height:36px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);padding:0 10px;font-family:var(--font-num);font-size:17px;font-variant-numeric:tabular-nums}
+.insight{color:var(--ink2);max-width:80ch}
+@media (max-width:820px){
+  .band{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cell:nth-child(3){border-left:0}
+  .cell:nth-child(n+3){border-top:1px solid var(--line)}
+}
+
+/* goal list */
+.sec-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.sec-head h2{font-size:18px;font-weight:700}
+.adder{display:flex;gap:8px;align-items:center}
+select,.btn{height:36px;border:1px solid var(--line2);border-radius:8px;background:var(--surface);padding:0 12px;cursor:pointer}
+.btn:hover,select:hover{border-color:var(--ink2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink2);text-decoration:underline;text-underline-offset:3px;padding:0 4px}
+.btn.armed{border-color:var(--st-bad);color:var(--st-bad)}
+.goals{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.gcard{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;cursor:pointer;min-width:0}
+.gcard:hover{border-color:var(--line2)}
+.gcard[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.gtop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.gname{font-weight:700;overflow-wrap:anywhere}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--s1);border-radius:3px}
+.gmeta{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:500;padding:2px 9px 2px 7px;border-radius:999px;white-space:nowrap;
+  background:color-mix(in srgb,var(--pc) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--pc) 45%,var(--surface))}
+.pill.good{--pc:var(--st-good)}.pill.warn{--pc:var(--st-warn)}.pill.bad{--pc:var(--st-bad)}
+
+/* workspace */
+.workspace{display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:920px){.workspace{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+#formPanel{position:sticky;top:16px;display:flex;flex-direction:column;gap:14px}
+@media (max-width:920px){#formPanel{position:static}}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>label{font-size:13px;color:var(--ink2)}
+.field input[type=text],.field input[type=number],.field select{width:100%;height:38px;border:1px solid var(--line2);border-radius:8px;background:var(--bg);padding:0 10px;font-family:var(--font-num);font-size:15px;font-variant-numeric:tabular-nums}
+.field input#f-name{font-family:var(--font-body)}
+.field select{font-family:var(--font-body)}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hint{font-size:12px;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0 0}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--ink2);cursor:pointer}
+.check input{margin-top:5px;accent-color:var(--accent)}
+.form-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+
+#analysis{display:flex;flex-direction:column;gap:22px;min-width:0}
+.block{display:flex;flex-direction:column;gap:12px;min-width:0}
+.block>h3{font-size:16px;font-weight:700;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.block>h3 small{font-weight:400;font-size:13px;color:var(--muted)}
+
+/* verdict */
+.verdict{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,260px);gap:20px;align-items:center}
+@media (max-width:700px){.verdict{grid-template-columns:minmax(0,1fr)}}
+.hero{font-family:var(--font-display);font-size:clamp(34px,7vw,52px);line-height:1.15;font-weight:700;letter-spacing:.01em}
+.hero small{font-size:.45em;font-weight:700;margin-right:6px;color:var(--ink2)}
+.vsub{color:var(--ink2);margin-top:4px}
+.meter{display:flex;flex-direction:column;gap:8px}
+.meter .bar{height:10px;border-radius:5px}
+.meter .bar>i{border-radius:5px}
+.meter-row{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+
+/* lenses */
+.tabs{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;align-self:flex-start;max-width:100%}
+.tab{border:0;background:transparent;padding:7px 16px;cursor:pointer;color:var(--ink2);font-weight:500;border-left:1px solid var(--line2)}
+.tab:first-child{border-left:0}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.lens{display:flex;flex-direction:column;gap:12px}
+.ans{display:flex;flex-wrap:wrap;gap:8px 28px}
+.ans>div{display:flex;flex-direction:column}
+.ans .big{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:26px;font-weight:600;line-height:1.3}
+.formula{font-family:var(--font-num);font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+.vars{width:100%;border-collapse:collapse;font-size:13.5px}
+.vars td{padding:6px 8px;border-top:1px solid var(--line)}
+.vars td:first-child{font-family:var(--font-num);width:64px;color:var(--ink2)}
+.vars td:last-child{text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.vars-wrap{overflow-x:auto}
+
+/* chart */
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{display:inline-block;width:14px;height:8px;border-radius:2px}
+.legend i.dash{height:0;border-top:2px dashed var(--s3);border-radius:0;width:18px}
+.chartwrap{position:relative;min-width:0}
+.chartwrap svg{display:block;width:100%;overflow:visible}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.5;min-width:168px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:3}
+.tip b{font-weight:700}
+.tip .r{display:flex;justify-content:space-between;gap:14px;align-items:center}
+.tip .r span:first-child{display:inline-flex;align-items:center;gap:6px;color:var(--ink2)}
+.tip .r i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.tip .n{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+
+/* advice */
+.advice{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.advice li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:4px 16px;padding:11px 0;border-top:1px solid var(--line)}
+.advice li:first-child{border-top:0}
+.advice .tag{font-weight:700;font-size:13.5px;color:var(--accent)}
+@media (max-width:560px){.advice li{grid-template-columns:minmax(0,1fr)}}
+
+/* sensitivity */
+.scroll{overflow-x:auto}
+table.sens{border-collapse:separate;border-spacing:3px;width:100%;min-width:480px;font-size:13px}
+table.sens th{font-weight:500;color:var(--muted);padding:4px 6px;text-align:center;white-space:nowrap}
+table.sens th.rh{text-align:right}
+table.sens td{text-align:center;padding:9px 4px;border-radius:5px;font-family:var(--font-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.sens td.base{outline:2px solid var(--ink);outline-offset:0}
+table.sens td svg{vertical-align:-2px;margin-right:3px}
+details.yearly summary{cursor:pointer;color:var(--ink2);padding:4px 0}
+.ytable{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+.ytable table{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.ytable th{position:sticky;top:0;background:var(--surface);text-align:right;padding:7px 10px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--line2)}
+.ytable td{text-align:right;padding:6px 10px;border-top:1px solid var(--line);font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.ytable th:first-child,.ytable td:first-child{text-align:left}
+.foot{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:16px}
+.foot p{max-width:70ch}
+@media (prefers-reduced-motion:no-preference){.bar>i{transition:width .25s ease}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div class="eyebrow">PV · FV · PMT 試算</div>
+    <h1>理財目標規劃</h1>
+    <p>設定每個人生目標的金額與時間，立刻看到每月該存多少、目前的計畫能走到哪裡，以及怎麼補上缺口。</p>
+    <div class="note" id="sampleNote" hidden>目前是範例數字，請直接改成你自己的目標與收入。修改後這則提示會消失。</div>
+  </header>
+
+  <section class="band" aria-label="整體總覽">
+    <div class="cell">
+      <label class="lab" for="income">月收入 (元)</label>
+      <input id="income" type="text" inputmode="numeric" autocomplete="off">
+      <span class="sub" id="ovIncSub"></span>
+    </div>
+    <div class="cell"><div class="lab">所有目標每月需存</div><div class="val" id="ovReq"></div><div class="sub" id="ovReqSub"></div></div>
+    <div class="cell"><div class="lab">目前每月已規劃</div><div class="val" id="ovCur"></div><div class="sub" id="ovCurSub"></div></div>
+    <div class="cell"><div class="lab">預估可達標的目標</div><div class="val" id="ovOk"></div><div class="sub" id="ovOkSub"></div></div>
+  </section>
+  <p class="insight" id="ovMsg"></p>
+
+  <section class="block" aria-label="目標清單">
+    <div class="sec-head">
+      <h2>我的目標</h2>
+      <div class="adder">
+        <label class="hint" for="addKind">新增</label>
+        <select id="addKind" aria-label="目標類型"></select>
+        <button class="btn primary" id="addBtn" type="button">加入</button>
+      </div>
+    </div>
+    <div class="goals" id="goals"></div>
+  </section>
+
+  <section class="workspace">
+    <aside class="panel" id="formPanel" aria-label="目標設定"></aside>
+    <div id="analysis"></div>
+  </section>
+
+  <footer class="foot">
+    <p>這是教育用試算工具，不構成投資建議。報酬率與通膨率都是假設值，實際結果會上下波動，也可能不如預期。</p>
+    <button class="btn ghost" id="resetBtn" type="button">還原範例資料</button>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+var KEY='finance-goal-planner-v1';
+var PRESETS={
+  retire:{label:'退休金',name:'退休金',target:1000,adj:true,infl:2,years:30,pv:80,rate:6,pmt:12000,due:false},
+  house:{label:'買房頭期款',name:'買房頭期款',target:300,adj:true,infl:2,years:8,pv:50,rate:4,pmt:15000,due:false},
+  edu:{label:'子女教育金',name:'子女教育金',target:200,adj:true,infl:2,years:15,pv:10,rate:5,pmt:6000,due:false},
+  safe:{label:'緊急預備金',name:'緊急預備金',target:18,adj:false,infl:2,years:2,pv:3,rate:1.5,pmt:7000,due:false},
+  trip:{label:'旅行與大額消費',name:'旅行與大額消費',target:30,adj:false,infl:2,years:3,pv:2,rate:1.5,pmt:6000,due:false},
+  custom:{label:'自訂目標',name:'我的目標',target:100,adj:true,infl:2,years:10,pv:0,rate:4,pmt:5000,due:false}
+};
+var uid=1, state, lens='pmt', lastDraw=null, saveTimer=null;
+
+function $(s){return document.querySelector(s);}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function newGoal(kind){var p=PRESETS[kind],g={id:'g'+(uid++),kind:kind};for(var k in p){if(k!=='label')g[k]=p[k];}return g;}
+function defaults(){return {income:90000,sample:true,goals:[newGoal('retire'),newGoal('house'),newGoal('safe')],sel:null};}
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw){var s=JSON.parse(raw);
+      if(s&&Array.isArray(s.goals)&&s.goals.length){
+        s.goals.forEach(function(g){var n=parseInt(String(g.id).replace('g',''),10);if(n>=uid)uid=n+1;});
+        return s;
+      }
+    }
+  }catch(e){}
+  return defaults();
+}
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}},250);
+}
+function cur(){
+  for(var i=0;i<state.goals.length;i++){if(state.goals[i].id===state.sel)return state.goals[i];}
+  state.sel=state.goals[0].id;return state.goals[0];
+}
+
+/* ---------- 財務函數 (月複利) ---------- */
+function fvOf(pv,pmt,i,n,due){
+  if(i===0)return pv+pmt*n;
+  var g=Math.pow(1+i,n);
+  return pv*g+pmt*(g-1)/i*(due?1+i:1);
+}
+function pmtFor(fv,pv,i,n,due){
+  if(i===0)return (fv-pv)/n;
+  var g=Math.pow(1+i,n);
+  return (fv-pv*g)*i/((g-1)*(due?1+i:1));
+}
+function pvFor(fv,pmt,i,n,due){
+  if(i===0)return fv-pmt*n;
+  var g=Math.pow(1+i,n);
+  return (fv-pmt*(g-1)/i*(due?1+i:1))/g;
+}
+function calc(g,o){
+  var P={},k;for(k in g)P[k]=g[k];if(o)for(k in o)P[k]=o[k];
+  var years=Math.max(1,Math.round(+P.years||1)),n=years*12,i=Math.max(0,+P.rate||0)/100/12;
+  var infF=P.adj?Math.pow(1+Math.max(0,+P.infl||0)/100,years):1;
+  var tgt=Math.max(0,+P.target||0)*1e4*infF,pv=Math.max(0,+P.pv||0)*1e4,pmt=Math.max(0,+P.pmt||0),due=!!P.due;
+  var fv=fvOf(pv,pmt,i,n,due),reqRaw=pmtFor(tgt,pv,i,n,due);
+  return {years:years,n:n,i:i,infF:infF,tgt:tgt,pv:pv,pmt:pmt,due:due,fv:fv,reqRaw:reqRaw,req:Math.max(0,reqRaw),
+    ratio:tgt>0?fv/tgt:1,growth:Math.pow(1+i,n),annual:(+P.rate||0)};
+}
+function extendYears(g){
+  for(var y=g.years+1;y<=g.years+40;y++){var c=calc(g,{years:y});if(c.fv>=c.tgt)return y;}
+  return null;
+}
+function earliestYear(g){
+  for(var y=1;y<=g.years;y++){var c=calc(g,{years:y});if(c.fv>=c.tgt)return y;}
+  return g.years;
+}
+function neededRate(g){
+  var c0=calc(g,{rate:0});if(c0.fv>=c0.tgt)return 0;
+  var hi=40,lo=0;
+  if(calc(g,{rate:hi}).fv<c0.tgt)return null;
+  for(var k=0;k<50;k++){var mid=(lo+hi)/2;var c=calc(g,{rate:mid});if(c.fv>=c.tgt)hi=mid;else lo=mid;}
+  return hi;
+}
+function band(years){
+  if(years<=3)return {name:'短期 (3 年內)',range:'1% 到 3%',upper:3,desc:'以定存、貨幣市場基金、短年期債券為主，重點是保本。'};
+  if(years<=10)return {name:'中期 (4 到 10 年)',range:'3% 到 5%',upper:5,desc:'債券與股票各佔一部分的平衡配置，越接近目標越降低股票比重。'};
+  return {name:'長期 (10 年以上)',range:'5% 到 7%',upper:7,desc:'可以用全球股票型 ETF 為核心定期定額，接近目標前 3 到 5 年逐步轉向債券。'};
+}
+
+/* ---------- 格式 ---------- */
+var nf0=new Intl.NumberFormat('en-US',{maximumFractionDigits:0});
+var nf1=new Intl.NumberFormat('en-US',{maximumFractionDigits:1});
+function fmt(v){return nf0.format(Math.round(v));}
+function money(v){return 'NT$ '+fmt(v);}
+function big(v){var a=Math.abs(v);if(a>=1e8)return nf1.format(v/1e8)+' 億';if(a>=1e4)return nf1.format(v/1e4)+' 萬';return fmt(v);}
+function moneyBig(v){return 'NT$ '+big(v);}
+function axisFmt(v){if(v===0)return '0';var a=Math.abs(v);if(a>=1e8)return nf1.format(v/1e8)+'億';if(a>=1e4)return nf1.format(v/1e4)+'萬';return fmt(v);}
+function pct(v){return nf1.format(v*100)+'%';}
+
+var ICON={
+  good:'<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#0ca30c"/><path d="M4.6 8.2l2.3 2.3 4.5-4.8" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warn:'<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5l6.8 12H1.2z" fill="#fab219"/><path d="M8 6v3.6M8 11.3v.4" stroke="#0b0b0b" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  bad:'<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#d03b3b"/><path d="M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>'
+};
+function status(r){
+  if(r>=1)return {k:'good',t:'預估達標'};
+  if(r>=0.85)return {k:'warn',t:'接近目標'};
+  return {k:'bad',t:'明顯落後'};
+}
+function pill(r){var s=status(r);return '<span class="pill '+s.k+'">'+ICON[s.k]+s.t+'</span>';}
+
+/* ---------- 總覽與清單 ---------- */
+function renderOverview(){
+  var sumReq=0,sumCur=0,ok=0,m=state.goals.length;
+  state.goals.forEach(function(g){var c=calc(g);sumReq+=c.req;sumCur+=c.pmt;if(c.ratio>=1)ok++;});
+  var inc=state.income;
+  $('#ovReq').textContent=money(sumReq);
+  $('#ovCur').textContent=money(sumCur);
+  $('#ovOk').textContent=ok+' / '+m;
+  $('#ovReqSub').textContent=inc>0?'佔月收入 '+pct(sumReq/inc):'請先填入月收入';
+  $('#ovCurSub').textContent=inc>0?'佔月收入 '+pct(sumCur/inc):'';
+  $('#ovOkSub').textContent=ok===m?'全部都在軌道上':(m-ok)+' 個目標需要調整';
+  $('#ovIncSub').textContent=inc>0?'每年約 '+moneyBig(inc*12):'';
+  var msg='';
+  if(inc>0){
+    var p=sumReq/inc;
+    if(p>0.5)msg='要完成全部目標，每月需存的金額超過月收入的一半，幾乎不可能長期維持。建議延長年限、降低目標金額，或分批完成。';
+    else if(p>0.3)msg='全部目標合計需要月收入的 '+pct(p)+'，負擔偏重。可以先確保緊急預備金與退休金，其他目標視情況延後。';
+    else msg='全部目標合計需要月收入的 '+pct(p)+'，在多數家庭可以負擔的範圍內。';
+    if(sumCur<sumReq)msg+=' 目前規劃的每月存款比需求少 '+money(sumReq-sumCur)+'。';
+  }else msg='填入月收入後，這裡會評估所有目標加起來的負擔是否合理。';
+  $('#ovMsg').textContent=msg;
+  $('#sampleNote').hidden=!state.sample;
+}
+function renderGoals(){
+  var h='';
+  state.goals.forEach(function(g){
+    var c=calc(g),w=Math.min(1,c.ratio)*100;
+    h+='<button type="button" class="gcard" data-id="'+g.id+'" aria-pressed="'+(g.id===state.sel)+'">'+
+      '<div class="gtop"><span class="gname">'+esc(g.name||'未命名目標')+'</span>'+pill(c.ratio)+'</div>'+
+      '<div class="bar" role="img" aria-label="預估達成率 '+pct(c.ratio)+'"><i style="width:'+w.toFixed(1)+'%"></i></div>'+
+      '<div class="gmeta"><span>'+c.years+' 年後 '+moneyBig(c.tgt)+'</span><span class="num">'+pct(c.ratio)+'</span></div>'+
+      '<div class="gmeta"><span>每月需存 <b class="num">'+fmt(c.req)+'</b></span><span>目前 <b class="num">'+fmt(c.pmt)+'</b></span></div>'+
+    '</button>';
+  });
+  $('#goals').innerHTML=h;
+}
+
+/* ---------- 表單 ---------- */
+function numField(id,label,val,o){
+  o=o||{};
+  return '<div class="field"><label for="'+id+'">'+label+'</label>'+
+    '<input id="'+id+'" type="number" inputmode="decimal" step="'+(o.step||1)+'" min="'+(o.min==null?0:o.min)+'"'+(o.max!=null?' max="'+o.max+'"':'')+' value="'+val+'">'+
+    (o.hint?'<span class="hint" id="'+id+'-h">'+o.hint+'</span>':'')+'</div>';
+}
+function buildForm(){
+  var g=cur();
+  $('#formPanel').innerHTML=
+    '<div class="eyebrow">目標設定</div>'+
+    '<div class="field"><label for="f-name">目標名稱</label><input id="f-name" type="text" maxlength="24" value="'+esc(g.name)+'" autocomplete="off"></div>'+
+    numField('f-target','目標金額 (萬元)',g.target,{step:1,hint:'<span id="f-target-h"></span>'})+
+    '<label class="check"><input id="f-adj" type="checkbox"'+(g.adj?' checked':'')+'><span>目標金額是「今天的購買力」，到期時自動加上通膨</span></label>'+
+    '<div id="infWrap">'+numField('f-infl','預期通膨率 (%/年)',g.infl,{step:0.1,max:15})+'</div>'+
+    '<div class="field"><label for="f-years">達成年限 (年)</label>'+
+      '<input id="f-years" type="number" inputmode="numeric" step="1" min="1" max="60" value="'+g.years+'">'+
+      '<input id="f-years-r" type="range" min="1" max="50" step="1" value="'+Math.min(50,g.years)+'" aria-label="年限拉桿"></div>'+
+    numField('f-pv','現有本金 PV (萬元)',g.pv,{step:0.5})+
+    '<div class="field"><label for="f-rate">預期年報酬率 (%)</label>'+
+      '<input id="f-rate" type="number" inputmode="decimal" step="0.1" min="0" max="30" value="'+g.rate+'">'+
+      '<input id="f-rate-r" type="range" min="0" max="12" step="0.1" value="'+Math.min(12,g.rate)+'" aria-label="報酬率拉桿"></div>'+
+    numField('f-pmt','目前每月存入 PMT (元)',g.pmt,{step:500})+
+    '<div class="field"><label for="f-due">每月存入時點</label><select id="f-due"><option value="end"'+(g.due?'':' selected')+'>月底存入 (期末)</option><option value="begin"'+(g.due?' selected':'')+'>月初存入 (期初)</option></select></div>'+
+    '<div class="form-foot"><span class="hint">年報酬以名目利率換算月複利</span><button type="button" class="btn ghost" id="delBtn">刪除這個目標</button></div>';
+  syncForm();wireForm();
+}
+function syncForm(){
+  var g=cur();
+  $('#infWrap').hidden=!g.adj;
+  var h=$('#f-target-h');
+  if(h)h.textContent='= '+moneyBig(g.target*1e4)+(g.adj?'，'+g.years+' 年後約需 '+moneyBig(calc(g).tgt):'');
+  $('#delBtn').disabled=state.goals.length<=1;
+  $('#delBtn').style.visibility=state.goals.length<=1?'hidden':'visible';
+}
+function touch(){state.sample=false;save();renderOverview();renderGoals();renderAnalysis();syncForm();}
+function wireForm(){
+  var g=cur();
+  function num(id,key,o){
+    var el=$('#'+id);
+    el.addEventListener('input',function(){
+      var v=parseFloat(el.value);if(!isFinite(v))v=0;
+      if(o&&o.min!=null&&v<o.min)v=o.min;
+      if(o&&o.max!=null&&v>o.max)v=o.max;
+      if(o&&o.int)v=Math.round(v);
+      g[key]=v;
+      if(o&&o.range){var r=$('#'+o.range);r.value=Math.min(+r.max,v);}
+      touch();
+    });
+  }
+  num('f-target','target',{min:0});
+  num('f-infl','infl',{min:0,max:15});
+  num('f-years','years',{min:1,max:60,int:true,range:'f-years-r'});
+  num('f-pv','pv',{min:0});
+  num('f-rate','rate',{min:0,max:30,range:'f-rate-r'});
+  num('f-pmt','pmt',{min:0});
+  $('#f-years-r').addEventListener('input',function(e){g.years=+e.target.value;$('#f-years').value=g.years;touch();});
+  $('#f-rate-r').addEventListener('input',function(e){g.rate=+e.target.value;$('#f-rate').value=g.rate;touch();});
+  $('#f-name').addEventListener('input',function(e){g.name=e.target.value;state.sample=false;save();renderGoals();renderAnalysis();});
+  $('#f-adj').addEventListener('change',function(e){g.adj=e.target.checked;touch();});
+  $('#f-due').addEventListener('change',function(e){g.due=e.target.value==='begin';touch();});
+  var del=$('#delBtn'),t=null;
+  del.addEventListener('click',function(){
+    if(!del.classList.contains('armed')){
+      del.classList.add('armed');del.textContent='再按一次確認刪除';
+      t=setTimeout(function(){del.classList.remove('armed');del.textContent='刪除這個目標';},3000);return;
+    }
+    clearTimeout(t);
+    state.goals=state.goals.filter(function(x){return x.id!==g.id;});
+    state.sel=state.goals[0].id;state.sample=false;save();
+    renderOverview();renderGoals();buildForm();renderAnalysis();
+  });
+}
+
+/* ---------- 分析 ---------- */
+function seriesOf(g,c){
+  var out=[];
+  for(var y=0;y<=c.years;y++){
+    var m=y*12,bal=fvOf(c.pv,c.pmt,c.i,m,c.due),pr=c.pv+c.pmt*m;
+    out.push({y:y,bal:bal,pr:pr,gain:bal-pr,rq:fvOf(c.pv,c.req,c.i,m,c.due)});
+  }
+  return out;
+}
+function adviceOf(g,c){
+  var list=[],inc=state.income,b=band(c.years);
+  var incTxt=function(v){return inc>0?'，約佔月收入 '+pct(v/inc):'';};
+  if(c.ratio<1){
+    var gap=c.req-c.pmt;
+    list.push({t:'每月加碼',b:'每月多存 <b>'+money(gap)+'</b>，合計每月 '+money(c.req)+incTxt(c.req)+'。這是最直接、不需要冒更多風險的方法。'});
+    var ext=extendYears(g);
+    list.push({t:'延長時間',b:ext?'維持每月 '+money(c.pmt)+'，再多等 <b>'+(ext-c.years)+' 年</b> (共 '+ext+' 年) 就能達標。':'即使再延長 40 年，目前的每月存款也追不上目標，請先提高每月金額。'});
+    var lump=(c.tgt-c.fv)/c.growth;
+    list.push({t:'一次投入',b:'現在一次多放 <b>'+money(lump)+'</b> 進去，不用調整每月金額也能達標 (例如年終獎金或閒置資金)。'});
+    list.push({t:'調整目標',b:'照目前計畫，約可達成 '+moneyBig(c.fv/c.infF)+(g.adj?' (以今天購買力計)':'')+'，是原目標的 '+pct(c.ratio)+'。'});
+    var rr=neededRate(g);
+    if(rr!=null){
+      list.push({t:'提高報酬',b:rr<=b.upper+0.5?'年報酬需要約 <b>'+nf1.format(rr)+'%</b>，仍在這個年限常見的 '+b.range+' 附近。':'年報酬需要約 <b>'+nf1.format(rr)+'%</b>，明顯高於這個年限常見的 '+b.range+'。不建議用提高風險的方式補缺口。'});
+    }
+  }else{
+    list.push({t:'維持現況',b:'照目前計畫，預估超出目標 <b>'+moneyBig(c.fv-c.tgt)+'</b>，進度良好。'});
+    if(c.pmt-c.req>1)list.push({t:'降低負擔',b:'每月只需存 '+money(c.req)+'，可以少存 <b>'+money(c.pmt-c.req)+'</b> 仍然達標。'});
+    var early=earliestYear(g);
+    if(early<c.years)list.push({t:'提早達標',b:'維持每月 '+money(c.pmt)+'，約第 <b>'+early+' 年</b> 就能達標，比原訂早 '+(c.years-early)+' 年。'});
+    var behind=state.goals.filter(function(x){return x.id!==g.id&&calc(x).ratio<1;});
+    if(behind.length&&c.pmt-c.req>1)list.push({t:'挪給其他目標',b:'多出來的每月 '+money(c.pmt-c.req)+' 可以改放到「'+esc(behind[0].name)+'」，它目前進度落後。'});
+  }
+  var over=c.annual>b.upper+1;
+  list.push({t:'報酬假設',b:over?'你設定的年報酬 '+nf1.format(c.annual)+'% 高於「'+b.name+'」常見的 '+b.range+'，建議用保守一點的數字再試算一次。'+b.desc:'你設定的年報酬 '+nf1.format(c.annual)+'% 落在「'+b.name+'」常見的 '+b.range+' 內。'+b.desc});
+  if(inc>0){
+    var p=c.req/inc;
+    list.push({t:'負擔檢查',b:'這個目標每月需存 '+money(c.req)+'，佔月收入 '+pct(p)+'。'+(p<=0.15?'負擔輕，很容易持續。':p<=0.3?'負擔適中，留意其他目標也要一起存。':'負擔偏重，長期可能難以維持，可以考慮延長年限或降低金額。')});
+  }
+  return list;
+}
+function lensHTML(g,c){
+  var ii=nf1.format(c.i*100*1000/1000);
+  var iTxt=(c.i*100).toFixed(4)+'%';
+  var rows;
+  if(lens==='pmt'){
+    rows=[['FV','目標終值',moneyBig(c.tgt)],['PV','現有本金',moneyBig(c.pv)],['i','月報酬率 (年 '+nf1.format(c.annual)+'% ÷ 12)',iTxt],['n','期數 (月)',c.n+' 個月']];
+    return '<div class="lens"><div class="ans"><div><span class="lab">要達標，每月需存</span><span class="big">'+(c.reqRaw<=0?'NT$ 0':money(c.req))+'</span></div>'+
+      '<div><span class="lab">你目前每月存</span><span class="big">'+money(c.pmt)+'</span></div></div>'+
+      '<p class="sub">先扣掉現有本金自己長大的部分，剩下的缺口，用每月固定存款補齊。'+(c.reqRaw<=0?'現有本金成長後就已經超過目標，不需要再每月存。':'')+'</p>'+
+      '<div class="formula">PMT = (FV − PV × (1+i)<sup>n</sup>) × i ÷ ((1+i)<sup>n</sup> − 1)'+(c.due?' ÷ (1+i)':'')+'</div>'+varsHTML(rows)+'</div>';
+  }
+  if(lens==='fv'){
+    rows=[['PV','現有本金',moneyBig(c.pv)],['PMT','每月存入',money(c.pmt)],['i','月報酬率 (年 '+nf1.format(c.annual)+'% ÷ 12)',iTxt],['n','期數 (月)',c.n+' 個月']];
+    var pr=c.pv+c.pmt*c.n;
+    return '<div class="lens"><div class="ans"><div><span class="lab">'+c.years+' 年後預估資產</span><span class="big">'+moneyBig(c.fv)+'</span></div>'+
+      '<div><span class="lab">其中投入的本金</span><span class="big">'+moneyBig(pr)+'</span></div>'+
+      '<div><span class="lab">其中複利收益</span><span class="big">'+moneyBig(c.fv-pr)+'</span></div></div>'+
+      '<p class="sub">依照你目前的每月存款，到期時本金與投資收益加總。目標是 '+moneyBig(c.tgt)+'。</p>'+
+      '<div class="formula">FV = PV × (1+i)<sup>n</sup> + PMT × ((1+i)<sup>n</sup> − 1) ÷ i'+(c.due?' × (1+i)':'')+'</div>'+varsHTML(rows)+'</div>';
+  }
+  rows=[['FV','目標終值',moneyBig(c.tgt)],['PMT','每月存入',money(c.pmt)],['i','月報酬率 (年 '+nf1.format(c.annual)+'% ÷ 12)',iTxt],['n','期數 (月)',c.n+' 個月']];
+  var alone=c.tgt/c.growth,minPv=Math.max(0,pvFor(c.tgt,c.pmt,c.i,c.n,c.due));
+  return '<div class="lens"><div class="ans"><div><span class="lab">不再每月存，今天要一次投入</span><span class="big">'+moneyBig(alone)+'</span></div>'+
+    '<div><span class="lab">搭配目前每月存款，現有本金至少需要</span><span class="big">'+moneyBig(minPv)+'</span></div></div>'+
+    '<p class="sub">現值是把未來的錢折回今天。你現有本金是 '+moneyBig(c.pv)+(minPv>c.pv?'，還差 '+moneyBig(minPv-c.pv)+'。':'，已經足夠。')+'</p>'+
+    '<div class="formula">PV = FV ÷ (1+i)<sup>n</sup><br>PV = (FV − PMT × ((1+i)<sup>n</sup> − 1) ÷ i'+(c.due?' × (1+i)':'')+') ÷ (1+i)<sup>n</sup></div>'+varsHTML(rows)+'</div>';
+}
+function varsHTML(rows){
+  var h='<div class="vars-wrap"><table class="vars"><tbody>';
+  rows.forEach(function(r){h+='<tr><td>'+r[0]+'</td><td style="text-align:left;font-family:var(--font-body);color:var(--ink2)">'+r[1]+'</td><td>'+r[2]+'</td></tr>';});
+  return h+'</tbody></table></div>';
+}
+function sensHTML(g,c){
+  var rates=[],yrs=[],base=c.annual,step=Math.max(1,Math.round(c.years*0.15)),k;
+  [-2,-1,0,1,2].forEach(function(d){var r=Math.round((base+d)*10)/10;if(r>=0&&rates.indexOf(r)<0)rates.push(r);});
+  [-2,-1,0,1,2].forEach(function(d){var y=c.years+d*step;if(y>=1&&yrs.indexOf(y)<0)yrs.push(y);});
+  var cells=[],min=Infinity,max=-Infinity;
+  rates.forEach(function(r){var row=[];yrs.forEach(function(y){var v=calc(g,{rate:r,years:y}).req;row.push(v);if(v<min)min=v;if(v>max)max=v;});cells.push(row);});
+  var h='<div class="scroll"><table class="sens"><thead><tr><th class="rh">每月需存 (元)</th>';
+  yrs.forEach(function(y){h+='<th scope="col">'+y+' 年</th>';});
+  h+='</tr></thead><tbody>';
+  rates.forEach(function(r,ri){
+    h+='<tr><th scope="row" class="rh">年報酬 '+nf1.format(r)+'%</th>';
+    cells[ri].forEach(function(v,yi){
+      var t=max>min?(v-min)/(max-min):0,p=Math.round(8+t*72);
+      var isBase=r===Math.round(base*10)/10&&yrs[yi]===c.years,okc=v<=c.pmt;
+      h+='<td class="'+(isBase?'base':'')+'" style="background:color-mix(in srgb,var(--s1) '+p+'%,var(--surface));color:'+(p>58?'#fff':'var(--ink)')+'" title="'+(okc?'你目前每月存款已足夠':'需要提高每月存款')+'">'+
+        (okc?'<svg viewBox="0 0 16 16" width="12" height="12" aria-label="已足夠"><path d="M3.5 8.4l3 3 6-6.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')+fmt(v)+'</td>';
+    });
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div><p class="hint">框線是目前的設定。打勾表示你目前每月存 '+money(c.pmt)+' 就已經足夠。顏色越深，每月需存越多。</p>';
+}
+function yearlyHTML(g,c,S){
+  var h='<details class="yearly"><summary>展開逐年數字表</summary><div class="ytable"><table><thead><tr><th>年</th><th>本金累計</th><th>複利收益</th><th>預估資產</th><th>達標路徑</th><th>達成率</th></tr></thead><tbody>';
+  S.forEach(function(r){h+='<tr><td>'+r.y+'</td><td>'+fmt(r.pr)+'</td><td>'+fmt(r.gain)+'</td><td>'+fmt(r.bal)+'</td><td>'+fmt(r.rq)+'</td><td>'+(c.tgt>0?pct(r.bal/c.tgt):'-')+'</td></tr>';});
+  return h+'</tbody></table></div></details>';
+}
+function renderAnalysis(){
+  var g=cur(),c=calc(g),S=seriesOf(g,c),st=status(c.ratio),A=adviceOf(g,c);
+  var diff=c.pmt-c.req;
+  var h='';
+  h+='<section class="panel block"><div class="verdict"><div>'+
+    '<div class="eyebrow">'+esc(g.name||'未命名目標')+'</div>'+
+    '<div class="vsub">'+c.years+' 年後要有 <b>'+moneyBig(c.tgt)+'</b>'+(g.adj?' (相當於今天的 '+moneyBig(c.tgt/c.infF)+')':'')+'，每月需存</div>'+
+    '<div class="hero"><small>NT$</small>'+fmt(c.req)+'</div>'+
+    '<div class="vsub">'+(c.reqRaw<=0?'現有本金已足夠，不必再每月存。':(diff>=0?'你目前每月存 '+money(c.pmt)+'，已超過需求 '+money(diff)+'。':'你目前每月存 '+money(c.pmt)+'，還差 '+money(-diff)+'。'))+'</div>'+
+    '</div><div class="meter"><div>'+pill(c.ratio)+'</div>'+
+    '<div class="bar" role="img" aria-label="預估達成率 '+pct(c.ratio)+'"><i style="width:'+(Math.min(1,c.ratio)*100).toFixed(1)+'%"></i></div>'+
+    '<div class="meter-row"><span>預估資產 <b class="num">'+moneyBig(c.fv)+'</b></span><span>目標 <b class="num">'+moneyBig(c.tgt)+'</b></span></div>'+
+    '<div class="meter-row"><span>預估達成率</span><b class="num">'+pct(c.ratio)+'</b></div></div></div></section>';
+
+  h+='<section class="panel block"><h3>三種算法 <small>PMT、FV、PV 互相換算</small></h3>'+
+    '<div class="tabs" role="tablist" aria-label="算法">'+
+    [['pmt','PMT 每月存多少'],['fv','FV 未來有多少'],['pv','PV 現在要多少']].map(function(t){return '<button type="button" role="tab" class="tab" data-lens="'+t[0]+'" aria-selected="'+(lens===t[0])+'">'+t[1]+'</button>';}).join('')+
+    '</div><div id="lensBody">'+lensHTML(g,c)+'</div></section>';
+
+  h+='<section class="panel block"><h3>資產成長預估 <small>每年年底</small></h3>'+
+    '<div class="legend"><span><i style="background:var(--s1)"></i>本金累計</span><span><i style="background:var(--s2)"></i>複利收益</span><span><i class="dash"></i>達標路徑 (每月存 '+fmt(c.req)+')</span></div>'+
+    '<div class="chartwrap" id="chartHost"></div>'+yearlyHTML(g,c,S)+'</section>';
+
+  h+='<section class="panel block"><h3>怎麼走到目標 <small>'+st.t+'</small></h3><ul class="advice">'+
+    A.map(function(a){return '<li><span class="tag">'+a.t+'</span><span>'+a.b+'</span></li>';}).join('')+'</ul></section>';
+
+  h+='<section class="panel block"><h3>如果條件變了 <small>每月需存金額的敏感度</small></h3>'+sensHTML(g,c)+'</section>';
+
+  $('#analysis').innerHTML=h;
+  lastDraw={g:g,c:c,S:S};
+  drawChart();
+}
+
+/* ---------- 圖表 ---------- */
+function niceStep(raw){
+  var e=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/e;
+  return (f<=1?1:f<=2?2:f<=5?5:10)*e;
+}
+function drawChart(){
+  var host=$('#chartHost');if(!host||!lastDraw)return;
+  var c=lastDraw.c,S=lastDraw.S,W=host.clientWidth||600,H=Math.round(Math.max(240,Math.min(360,W*0.5)));
+  var ml=W<480?46:56,mr=12,mt=14,mb=28,pw=W-ml-mr,ph=H-mt-mb,Y=c.years;
+  var maxV=Math.max(c.tgt,S[Y].bal,S[Y].rq,1)*1.04,step=niceStep(maxV/4),ymax=Math.ceil(maxV/step)*step;
+  function X(y){return ml+pw*y/Y;}
+  function V(v){return mt+ph*(1-v/ymax);}
+  var s='<svg id="chartSvg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="資產成長圖，詳細數字見下方逐年表">';
+  for(var t=0;t<=ymax+step/2;t+=step){
+    var yy=V(t);
+    s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'+
+       '<text x="'+(ml-8)+'" y="'+(yy+4)+'" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--font-num)">'+axisFmt(t)+'</text>';
+  }
+  var xs=Y<=10?1:Y<=20?2:Y<=40?5:10;
+  for(var y=0;y<=Y;y+=xs){
+    s+='<text x="'+X(y)+'" y="'+(H-8)+'" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--font-num)">'+y+'年</text>';
+  }
+  s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+V(0)+'" y2="'+V(0)+'" stroke="var(--line2)" stroke-width="1"/>';
+  function path(key,base){
+    var d='M'+X(0)+','+V(S[0][key]);
+    S.forEach(function(r){d+=' L'+X(r.y)+','+V(r[key]);});
+    return d;
+  }
+  var dPr=path('pr'),dBal=path('bal');
+  var area1=dPr+' L'+X(Y)+','+V(0)+' L'+X(0)+','+V(0)+' Z';
+  var area2=dBal;for(var k=S.length-1;k>=0;k--)area2+=' L'+X(S[k].y)+','+V(S[k].pr);area2+=' Z';
+  s+='<path d="'+area1+'" fill="var(--s1)" fill-opacity="0.28"/>'+
+     '<path d="'+area2+'" fill="var(--s2)" fill-opacity="0.30"/>'+
+     '<path d="'+dPr+'" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>'+
+     '<path d="'+dBal+'" fill="none" stroke="var(--s2)" stroke-width="2" stroke-linejoin="round"/>'+
+     '<path d="'+path('rq')+'" fill="none" stroke="var(--s3)" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
+  var ty=V(c.tgt);
+  s+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+ty+'" y2="'+ty+'" stroke="var(--ink2)" stroke-width="1" stroke-dasharray="2 3"/>'+
+     '<text x="'+(ml+6)+'" y="'+(ty-6)+'" font-size="12" fill="var(--ink2)" font-family="var(--font-body)">目標 '+moneyBig(c.tgt)+'</text>';
+  var reach=null;for(var q=0;q<S.length;q++){if(S[q].bal>=c.tgt){reach=S[q];break;}}
+  if(reach&&reach.y>0){
+    var rx=X(reach.y),ry=V(reach.bal),anchor=rx>W-90?'end':'middle';
+    s+='<circle cx="'+rx+'" cy="'+ry+'" r="5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2"/>'+
+       '<text x="'+rx+'" y="'+(ry+20)+'" text-anchor="'+anchor+'" font-size="12" font-weight="700" fill="var(--ink)" font-family="var(--font-body)">第 '+reach.y+' 年達標</text>';
+  }
+  s+='<line id="cx" x1="0" x2="0" y1="'+mt+'" y2="'+(mt+ph)+'" stroke="var(--ink2)" stroke-width="1" visibility="hidden"/>'+
+     '<circle id="d1" r="4.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>'+
+     '<circle id="d2" r="4.5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>'+
+     '<rect id="hit" x="'+ml+'" y="'+mt+'" width="'+pw+'" height="'+ph+'" fill="transparent" style="cursor:crosshair"/></svg>'+
+     '<div class="tip" id="tip" hidden></div>';
+  host.innerHTML=s;
+  var hit=$('#hit'),tip=$('#tip'),cx=$('#cx'),d1=$('#d1'),d2=$('#d2');
+  function move(e){
+    var r=host.getBoundingClientRect(),px=e.clientX-r.left;
+    var yi=Math.max(0,Math.min(Y,Math.round((px-ml)/pw*Y))),row=S[yi],x=X(yi);
+    cx.setAttribute('x1',x);cx.setAttribute('x2',x);cx.setAttribute('visibility','visible');
+    d1.setAttribute('cx',x);d1.setAttribute('cy',V(row.pr));d1.setAttribute('visibility','visible');
+    d2.setAttribute('cx',x);d2.setAttribute('cy',V(row.bal));d2.setAttribute('visibility','visible');
+    tip.hidden=false;
+    tip.innerHTML='<b>第 '+yi+' 年</b>'+
+      '<div class="r"><span><i style="background:var(--s1)"></i>本金累計</span><span class="n">'+moneyBig(row.pr)+'</span></div>'+
+      '<div class="r"><span><i style="background:var(--s2)"></i>複利收益</span><span class="n">'+moneyBig(row.gain)+'</span></div>'+
+      '<div class="r"><span>預估資產</span><span class="n"><b>'+moneyBig(row.bal)+'</b></span></div>'+
+      '<div class="r"><span><i style="background:var(--s3)"></i>達標路徑</span><span class="n">'+moneyBig(row.rq)+'</span></div>'+
+      '<div class="r"><span>達成率</span><span class="n">'+(c.tgt>0?pct(row.bal/c.tgt):'-')+'</span></div>';
+    var tw=tip.offsetWidth,left=x+14;if(left+tw>W)left=x-tw-14;if(left<0)left=0;
+    tip.style.left=left+'px';tip.style.top=Math.max(0,V(row.bal)-20)+'px';
+  }
+  function leave(){tip.hidden=true;cx.setAttribute('visibility','hidden');d1.setAttribute('visibility','hidden');d2.setAttribute('visibility','hidden');}
+  hit.addEventListener('pointermove',move);hit.addEventListener('pointerdown',move);hit.addEventListener('pointerleave',leave);
+}
+
+/* ---------- 事件 ---------- */
+function money2int(s){var v=parseInt(String(s).replace(/[^0-9]/g,''),10);return isFinite(v)?v:0;}
+function init(){
+  state=load();if(!state.goals.length)state=defaults();
+  if(!cur())state.sel=state.goals[0].id;
+  var sel=$('#addKind'),o='';for(var k in PRESETS)o+='<option value="'+k+'">'+PRESETS[k].label+'</option>';sel.innerHTML=o;
+  var inc=$('#income');inc.value=fmt(state.income||0);
+  inc.addEventListener('input',function(){state.income=money2int(inc.value);state.sample=false;save();renderOverview();renderAnalysis();});
+  inc.addEventListener('blur',function(){inc.value=fmt(state.income||0);});
+  $('#addBtn').addEventListener('click',function(){
+    var g=newGoal(sel.value);state.goals.push(g);state.sel=g.id;state.sample=false;save();
+    renderOverview();renderGoals();buildForm();renderAnalysis();
+  });
+  $('#goals').addEventListener('click',function(e){
+    var b=e.target.closest('.gcard');if(!b)return;
+    state.sel=b.getAttribute('data-id');save();renderGoals();buildForm();renderAnalysis();
+    if(window.innerWidth<=920){var a=$('#formPanel');if(a&&a.scrollIntoView)a.scrollIntoView({behavior:'smooth',block:'start'});}
+  });
+  $('#analysis').addEventListener('click',function(e){
+    var b=e.target.closest('.tab');if(!b)return;
+    lens=b.getAttribute('data-lens');
+    var tabs=document.querySelectorAll('.tab');for(var i=0;i<tabs.length;i++)tabs[i].setAttribute('aria-selected',tabs[i]===b?'true':'false');
+    $('#lensBody').innerHTML=lensHTML(lastDraw.g,lastDraw.c);
+  });
+  var rb=$('#resetBtn'),rt=null;
+  rb.addEventListener('click',function(){
+    if(!rb.classList.contains('armed')){
+      rb.classList.add('armed');rb.textContent='再按一次確認，會清除你的設定';
+      rt=setTimeout(function(){rb.classList.remove('armed');rb.textContent='還原範例資料';},3000);return;
+    }
+    clearTimeout(rt);rb.classList.remove('armed');rb.textContent='還原範例資料';
+    uid=1;state=defaults();state.sel=state.goals[0].id;save();
+    inc.value=fmt(state.income);renderOverview();renderGoals();buildForm();renderAnalysis();
+  });
+  var rz=null;window.addEventListener('resize',function(){clearTimeout(rz);rz=setTimeout(drawChart,120);});
+  renderOverview();renderGoals();buildForm();renderAnalysis();
+}
+init();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "finance-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "理財目標規劃：用 PV、FV、PMT 計算每月該存多少",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name finance-planner"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
